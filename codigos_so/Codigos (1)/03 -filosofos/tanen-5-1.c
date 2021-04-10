@@ -1,0 +1,155 @@
+/*
+   Implementação com alto paralelismo, mas sujeita a starvation.
+   Mesa com 5 filósofos, 1 morre de fome.
+
+   Gráfico simplificado:
+   
+   0  .HHHHHHHHHHHHHHHHHH
+
+   1  EEE_EEE_EEE_EEE_EEE
+
+   2  ...E___E___E___E___
+
+   3  .E___E___E___E___E_
+
+   4  ..EEE_EEE_EEE_EEE_E
+   
+ */
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <semaphore.h>
+
+#define N 5
+#define MAX_REFEICOES 40
+
+#define ESQ (phil_id + 1) % N
+#define DIR (phil_id + N - 1) % N
+
+typedef enum {T, H, E} estado_t;
+estado_t estado[N];
+
+sem_t sem;
+sem_t filosofo[N];
+
+/* Contabilidade */
+sem_t sem_ref;
+int refeicoes[N], total_refeicoes;
+
+/* Considera que já adquiriu o semaforo
+   ou está no início da execução   */
+void exibe_mesa() {
+  int i;
+  for (i = 0; i < N; i++)
+    switch (estado[i]) {
+    case T:  printf("T ");
+      break;
+    case H:  printf("H ");
+      break;
+    case E:  printf("E ");
+      break;
+    }
+  printf("\n");
+}
+
+/* Considera que já adquiriu o semaforo */
+void testa_garfos(int phil_id) {
+  if (estado[phil_id] == H && estado[ESQ] != E && estado[DIR] != E) {
+    estado[phil_id] = E;
+    exibe_mesa();
+    sem_post(&filosofo[phil_id]);
+  }
+}
+
+void pensa(int phil_id) {
+  if (phil_id == 2 || phil_id == 3)
+    sleep(3);
+  else
+    sleep(1);  
+}
+
+void pega_garfos(int phil_id) {
+  sem_wait(&sem);
+  estado[phil_id] = H;
+  exibe_mesa();
+  testa_garfos(phil_id);
+  sem_post(&sem);
+  sem_wait(&filosofo[phil_id]);
+}
+
+
+void come(int phil_id) {
+  sem_wait(&sem_ref);
+  refeicoes[phil_id]++;
+  total_refeicoes++;
+  if (total_refeicoes == MAX_REFEICOES) {
+    int i;
+    printf("Total de refeicoes: \n");
+    for (i = 0; i < N; i++)
+      printf("Filosofo %d: %d\n", i, refeicoes[i]);
+    /* Aborta execução */
+    exit(0);
+  }
+  sem_post(&sem_ref);
+  if (phil_id == 2 || phil_id == 3)
+    sleep(1);
+  else
+    sleep(3);
+}
+
+void solta_garfos(int phil_id) {
+  sem_wait(&sem);
+  estado[phil_id] = T;
+  exibe_mesa();
+  testa_garfos(ESQ);
+  testa_garfos(DIR);
+  sem_post(&sem);
+}
+
+void* f_phil(void *v) {
+  int phil_id = *(int *) v;
+
+  if (phil_id == 0) sleep(1);
+  else if (phil_id == 2) sleep(3);
+  else if (phil_id == 3) sleep(1);
+  else if (phil_id == 4) sleep(2);
+  
+  while(1) {
+    
+    pega_garfos(phil_id);
+
+    come(phil_id);
+    
+    solta_garfos(phil_id);
+
+    pensa(phil_id);
+  }
+}
+      
+
+int main() {
+  pthread_t thr[N];
+  int i, phil_id[N];
+
+  sem_init(&sem, 0, 1);
+  sem_init(&sem_ref, 0, 1);
+  total_refeicoes = 0;
+  for (i = 0; i < N; i++) {
+    phil_id[i] = i;    
+    sem_init(&filosofo[i], 0, 0);
+    estado[i] = T;
+    refeicoes[i] = 0;
+  }
+	     
+  exibe_mesa();
+  
+  for (i = 0; i < N; i++) 
+    pthread_create(&thr[i], NULL, f_phil, (void*) &phil_id[i]);
+
+  for (i = 0; i < N; i++) 
+    pthread_join(thr[i], NULL);
+  
+  return 0;
+}

@@ -1,0 +1,230 @@
+\begin{myslide}
+
+\begin{center}
+
+{\large \sf \textbf{MC514\\
+Sistemas Operacionais:\\  
+Teoria e Prática}\\
+1s2006}
+
+\bigskip
+
+\subheading{Produtores e consumidores}
+\subheading{utilizando locks e variáveis de condição}
+
+%  Acho que não está ok!
+
+\end{center}
+\end{myslide}
+
+\begin{myslide}
+\heading{Produtor-Consumidor}
+\subheading{utilizando semáforos}
+{\normalsize
+\alltt{
+semaforo cheio = 0, vazio = N;
+
+{\Large\textbf{Produtor:}}               {\Large \textbf{Consumidor:}}
+while (true)                    while (true) 
+   wait(vazio);                    wait(cheio);
+   f = (f + 1) % N;                i = (i + 1) % N;
+   buffer[f] = produz();           consome(buffer[i]);    
+   signal(cheio);                  signal(vazio);
+}}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtor-Consumidor}
+\subheading{Primeira tentativa}
+\alltt{\normalsize
+int c = 0;  /* Contador de posições ocupadas */
+mutex_t lock_c; /* lock para o contador */
+
+cond_t pos_vazia;   /* Para o produtor esperar */
+cond_t pos_ocupada; /* Para o consumidor esperar */
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtor-Consumidor}
+\subheading{Primeira tentativa}
+\alltt{\normalsize
+int f = 0;
+{\large\textbf{\textsf{Produtor:}}}
+    mutex_lock(&lock_c);
+    if (c == N) 
+      cond_wait(&pos_vazia, &lock_c);
+    f = (f+1)%N;
+    buffer[f] = produz();
+    c++;
+    if (c == 1)
+      cond_signal(&pos_ocupada);
+    mutex_unlock(&lock_c);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtor-Consumidor}
+\subheading{Primeira tentativa}
+\medskip
+\alltt{\normalsize
+int i = 0;
+{\large\textbf{\textsf{Consumidor:}}}
+    mutex_lock(&lock_c);
+    if (c == 0)
+      cond_wait(&pos_ocupada, &lock_c);
+    i = (i+1)%N;
+    consome(buffer[i]);
+    if (c == N-1)
+      cond_signal(&pos_vazia);
+    c--;      
+    mutex_unlock(&lock_c);
+}
+\end{myslide}
+
+\begin{myslide}
+\heading{Produtor-Consumidor}
+\subheading{Paralelismo entre as threads}
+{\normalsize
+\alltt{
+semaforo cheio = 0, vazio = N;
+
+{\Large\textbf{Produtor:}}               {\Large \textbf{Consumidor:}}
+while (true)                    while (true) 
+   wait(vazio);                    wait(cheio);
+   f = (f + 1) % N;                i = (i + 1) % N;
+   buffer[f] = produz();           consome(buffer[i]);    
+   signal(cheio);                  signal(vazio);
+}}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtor-Consumidor}
+\alltt{\normalsize
+cond_t pos_vazia, pos_ocupada; mutex_t lock_v, lock_o;
+int i = 0, f = 0, nv = N, no = 0;
+{\large\textbf{\textsf{Produtor:}}}
+    mutex_lock(&lock_v);
+    if (nv == 0) cond_wait(&pos_vazia, &lock_v);
+    nv--;
+    mutex_unlock(&lock_v);
+    f = (f+1)%N;
+    buffer[f] = produz();
+    mutex_lock(&lock_o);
+    no++;
+    cond_signal(&pos_ocupada);
+    mutex_unlock(&lock_o);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtor-Consumidor}
+\medskip
+\alltt{\normalsize
+{\large\textbf{\textsf{Consumidor:}}}
+    mutex_lock(&lock_o);
+    if (no == 0) cond_wait(&pos_ocupada, &lock_o);
+    no--;
+    mutex_unlock(&lock_o);
+    i = (i+1)%N;
+    consome(buffer[i]);
+    mutex_lock(&lock_v);
+    nv++;
+    cond_signal(&pos_vazia);
+    mutex_unlock(&lock_v);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+  \subheading{Locks e variáveis de condição}
+\alltt{
+cond_t pos_vazia, pos_ocupada; 
+mutex_t lock_v, lock_o;
+int nv = N, no = 0;
+
+mutex_t lock_i, lock_f;
+int i = 0, f = 0;
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+\alltt{\normalsize
+{\large\textbf{\textsf{Produtor:}}}
+    item = produz();
+    mutex_lock(&lock_v);
+    if (nv == 0) cond_wait(&pos_vazia, &lock_v);
+    nv--;
+    mutex_unlock(&lock_v);
+    mutex_lock(&lock_f);
+    f = (f+1)%N;
+    buffer[f] = item;
+    mutex_unlock(&lock_f);
+    mutex_lock(&lock_o);
+    no++;
+    cond_signal(&pos_ocupada);
+    mutex_unlock(&lock_o);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+\alltt{\normalsize
+{\large\textbf{\textsf{Consumidor:}}}
+    mutex_lock(&lock_o);
+    if (no == 0) cond_wait(&pos_ocupada, &lock_o);
+    no--;
+    mutex_unlock(&lock_o);
+    mutex_lock(&lock_i);
+    i = (i+1)%N;
+    item = buffer[i];
+    mutex_unlock(&lock_i);
+    mutex_lock(&lock_v);
+    nv++;
+    cond_signal(&pos_vazia);
+    mutex_unlock(&lock_v);
+    consome(item);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+  \subheading{Solução híbrida}
+\alltt{
+sem_t pos_vazia = N, pos_ocupada; 
+
+mutex_t lock_i, lock_f;
+int i = 0, f = 0;
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+\alltt{\normalsize
+{\large\textbf{\textsf{Produtor:}}}
+    item = produz();
+    wait(&pos_vazia);
+    mutex_lock(&lock_f);
+    f = (f+1)%N;
+    buffer[f] = item;
+    mutex_unlock(&lock_f);
+    signal(&pos_ocupada);
+}
+\end{myslide}
+
+\begin{myslide}
+  \heading{Produtores-Consumidores}
+\medskip
+\alltt{\normalsize
+{\large\textbf{\textsf{Consumidor:}}}
+    wait(&pos_ocupada);
+    mutex_lock(&lock_i);
+    i = (i+1)%N;
+    item = buffer[i];
+    mutex_unlock(&lock_i);
+    signal(&pos_vazia);
+    consome(item);
+}
+\end{myslide}
+

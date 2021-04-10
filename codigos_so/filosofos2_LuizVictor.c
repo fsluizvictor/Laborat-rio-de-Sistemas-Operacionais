@@ -1,0 +1,80 @@
+#include <stdio.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define N 5 /* N Ã© o nÃºmero de filÃ³sofos */
+
+int estado_filosofo[N]; /* esta variÃ¡vel indica o estado do filÃ³sofo. 0=>pensando. 1=> comendo */
+sem_t garfo[N];         /* o semÃ¡foro simula o garfo. O valor inicial serÃ¡ 1 para cada um, indicando que o garfo estÃ¡ livre*/
+                        /* para usar o garfo, o filÃ³sofo deve fazer um down no garfo. */
+                        /* quando terminar de usar, o filÃ³sofo deve fazer um up no garfo. */
+sem_t m;
+
+void *filosofo(void *);
+
+int main()
+{
+    srandom(time(NULL)); /* inicializa a semente do gerador de nÃºmeros aleatÃ³rios */
+
+    pthread_t tid[N]; /* identificador das threads */
+    int i;            /* contador */
+
+    sem_init(&m, 0, 1);
+
+    for (i = 0; i < N; i++)        /* inicializaÃ§Ã£o dos semÃ¡foros para simular os garfos */
+        sem_init(&garfo[i], 0, 1); /* valor inicial = 1 */
+
+    for (i = 0; i < N; i++)
+    {                                                /* criaÃ§Ã£o das threads representando os filosofos */
+        sem_wait(&m);                                /* quem pode me dizer para que serve o semÃ¡foro m? */
+        pthread_create(&tid[i], NULL, filosofo, &i); /* o parÃ¢metro i indica o nÃºmero do filosofo */
+    }
+
+    for (i = 0; i < N; i++) /* processo pai aguarda o fim de todas as threads */
+        pthread_join(tid[i], NULL);
+}
+
+/* cÃ³digo da thread */
+void *filosofo(void *arg)
+{
+    int p, i, j;
+    p = *((int *)arg); /* faz uma cÃ³pia local do valor passado por referÃªncia */
+                       /* a variÃ¡vel p indica o nÃºmero do filÃ³sofo */
+
+    sem_post(&m); /* quem pode me dizer para que serve o semÃ¡foro m? */
+    printf("\nFilosofo %d pronto", p);
+    fflush(stdout);
+
+    while (1) /* para sempre */
+    {
+        usleep(1000.0 * (float)random() / RAND_MAX); /* filosofo dorme durante um tempo randÃ´mico entre 0 e 1000 micro-segundos*/
+        sem_wait(&garfo[p]);                         /* pega garfo p       */
+        sem_wait(&garfo[(p + 1) % N]);               /* pega garfo (p+1)%N */
+        estado_filosofo[p] = 1;
+        /* imprime o estado dos filÃ³sofos 0=> pensando, 1=> comendo */
+        printf("\nFilosofo %d ----------------------------------", p);
+        printf("\n       Estado dos Filosofos - [ ");
+        for (i = 0; i < N; i++)
+            printf("%d ", estado_filosofo[i]);
+        printf(" ]");
+        printf("\n       Garfo dos Garfos------ [ ");
+        for (i = 0; i < N; i++)
+        {
+            sem_getvalue(&garfo[i], &j);
+            printf("%d ", j);
+        }
+        printf(" ]");
+        fflush(stdout);                              /* para garantir a impressÃ£o no vÃ­deo */
+        usleep(1000.0 * (float)random() / RAND_MAX); /* filosofo come durante um tempo randÃ´mico entre 0 e 1000 micro-segundos*/
+        estado_filosofo[p] = 0;
+        sem_post(&garfo[p]);
+        sem_post(&garfo[(p + 1) % N]);
+    }
+}

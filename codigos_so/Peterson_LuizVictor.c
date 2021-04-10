@@ -1,0 +1,95 @@
+
+/* peterson.c */
+
+/* ************************************************** Includes */
+#include <stdio.h>
+#include <sys/wait.h>
+
+
+/* ************************************************** Defines */
+#define TRUE 1
+#define FALSE 0
+
+
+/* ************************************************** Global Varialbles */
+int flag[2], turn;
+
+
+/* ************************************************** Thread 0 */
+void peterson_th0( void )
+{
+  int i, j, k;
+  
+  for( i=0; i<5; i++ ) {
+    /* Prepara-se para ENTRAR da Regiao Critica */
+    flag[0] = TRUE;
+    turn = 1;
+    while( flag[1] & turn == 1 ) ;
+
+    /* Processo dentro da Regiao Critica */
+    printf("  Thread 0: ... Regiao Critica ... \n");
+
+    /* Prepara-se para SAIR da Regiao Critica */
+    flag[0] = FALSE;
+
+    /* Simula um Processamento qualquer */
+    for( j=0; j<16384; j++ )
+      for( k=0; k<8192; k++) ;
+  }
+}
+
+
+/* ************************************************** Thread 1 */
+void peterson_th1( void )
+{
+  int i, j, k;
+
+  for( i=0; i<8; i++ ) {
+    /* Prepara-se para ENTRAR da Regiao Critica */
+    flag[1] = TRUE;
+    turn = 0;
+    while( flag[0] & turn == 0 ) ;
+
+    /* Processo dentro da Regiao Critica */
+    printf("    Thread 1: ... Regiao Critica ... \n");
+
+    /* Prepara-se para SAIR da Regiao Critica */
+    flag[1] = FALSE;
+
+    /* Simula um Processamento qualquer */
+    for( j=0; j<8192; j++ )
+      for( k=0; k<4096; k++) ;
+  }
+}
+
+
+/* ************************************************** Main Program */
+int main( int argc, char* argv[] )
+{
+  pthread_t th0, th1;
+  int r_th0, r_th1;
+
+  printf("Desenvolvido por Luiz Victor");
+
+  turn = 0;
+  flag[0] = flag[1] = FALSE;
+
+  printf("Thread \"Main\": Algoritmo de \"Peterson\" \n");
+  
+  if( pthread_create( &th0, NULL, (void *) peterson_th0, NULL ) != 0 ) {
+    printf("Error \"pthread_create\" p/ Thread 0.\n");
+    exit(1);
+  }
+
+  if( pthread_create( &th1, NULL, (void *) peterson_th1, NULL ) != 0 ) {
+    printf("Error \"pthread_create\" p/ Thread 1.\n");
+    exit(1);
+  }
+
+  /* Sincroniza o termino da Thread "Main" com as Threads "th0" e "th1" */
+  printf("Thread \"Main\": Sincroniza termino com Threads 0 e 1.\n");
+  pthread_join( th0, (void *) &r_th0 );
+  pthread_join( th1, (void *) &r_th1 );
+  printf("Thread \"Main\": Termina.\n");
+  exit(0);
+}
